@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Shield, Sparkles, Search, BarChart3, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Shield, Sparkles, Search, BarChart3, ArrowRight, CheckCircle2, User as UserIcon, LogOut, History } from "lucide-react";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,6 +16,14 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const { user, status, signOut } = useAuth();
+  const navigate = useNavigate();
+  const loggedIn = status === "authenticated" && !!user;
+
+  const handleAnalyze = () => {
+    navigate({ to: loggedIn ? "/dashboard" : "/auth" });
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -30,9 +39,32 @@ function Landing() {
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
             <a href="#how" className="hover:text-foreground transition-colors">How it works</a>
           </nav>
-          <Button asChild size="sm" variant="hero">
-            <Link to="/dashboard">Launch app</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {loggedIn ? (
+              <>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/history" className="gap-1.5">
+                    <History className="w-4 h-4" /> History
+                  </Link>
+                </Button>
+                <div className="flex items-center gap-2 pl-2 ml-1 border-l border-border/60">
+                  <div className="w-7 h-7 rounded-full bg-primary/15 grid place-items-center text-primary">
+                    {user?.photoURL ? (
+                      <img src={user.photoURL} alt="" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+                  <span className="hidden sm:inline text-xs text-muted-foreground max-w-[140px] truncate">
+                    {user?.displayName ?? user?.email}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => signOut()} aria-label="Sign out">
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -53,15 +85,10 @@ function Landing() {
             Paste any article, claim, or URL. Veritas extracts the key statements, verifies them
             against trusted sources, and gives you a credibility score — in seconds.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-3 animate-fade-in">
-            <Button asChild size="lg" variant="hero" className="group">
-              <Link to="/dashboard">
-                Analyze Content
-                <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <a href="#features">See how it works</a>
+          <div className="mt-10 flex items-center justify-center animate-fade-in">
+            <Button onClick={handleAnalyze} size="lg" variant="hero" className="group">
+              Analyze Content
+              <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
             </Button>
           </div>
         </div>
