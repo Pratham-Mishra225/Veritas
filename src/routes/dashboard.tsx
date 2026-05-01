@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles, FileText, LinkIcon, Share2, AlertCircle } from "lucide-react";
@@ -9,7 +9,6 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { AnalysisReport } from "@/components/analysis/AnalysisReport";
 import { ShareDialog } from "@/components/analysis/ShareDialog";
 import { STAGE_LABEL, type AnalysisStage } from "@/lib/analysis/types";
-import { AuthDialog } from "@/components/layout/AuthDialog";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -26,22 +25,33 @@ const STAGES: AnalysisStage[] = ["extracting", "verifying", "generating"];
 function Dashboard() {
   const { user, status: authStatus } = useAuth();
   const { current, stage, error, analyze } = useAnalysis();
+  const navigate = useNavigate();
   const [input, setInput] = useState("");
   const [mode, setMode] = useState<"text" | "url">("text");
   const [shareOpen, setShareOpen] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
 
   const isLoading = stage === "extracting" || stage === "verifying" || stage === "generating";
   const loggedIn = authStatus === "authenticated" && !!user;
 
-  const handleAnalyze = async () => {
-    if (!input.trim()) return;
-    if (!loggedIn) {
-      setAuthOpen(true);
-      return;
+  // Gate: redirect unauthenticated users to /auth
+  useEffect(() => {
+    if (authStatus === "unauthenticated") {
+      navigate({ to: "/auth", search: { redirect: "/dashboard" } });
     }
+  }, [authStatus, navigate]);
+
+  const handleAnalyze = async () => {
+    if (!input.trim() || !loggedIn) return;
     await analyze(input, mode);
   };
+
+  if (authStatus !== "authenticated") {
+    return (
+      <div className="min-h-screen grid place-items-center bg-background text-muted-foreground">
+        <Loader2 className="w-6 h-6 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -95,11 +105,9 @@ function Dashboard() {
 
           <div className="mt-5 flex items-center justify-between gap-4">
             <p className="text-xs text-muted-foreground">
-              {!loggedIn
-                ? "Sign in to run an analysis."
-                : input.length > 0
-                  ? `${input.length} characters`
-                  : "Tip: longer text yields better analysis."}
+              {input.length > 0
+                ? `${input.length} characters`
+                : "Tip: longer text yields better analysis."}
             </p>
             <Button onClick={handleAnalyze} disabled={!input.trim() || isLoading} variant="hero" size="lg">
               {isLoading ? (
@@ -139,7 +147,6 @@ function Dashboard() {
       </main>
 
       <ShareDialog open={shareOpen} onOpenChange={setShareOpen} analysisId={current?.id ?? null} />
-      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
     </div>
   );
 }
