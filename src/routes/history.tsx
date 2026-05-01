@@ -22,8 +22,12 @@ function HistoryPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (status === "authenticated") loadHistory();
-  }, [status, loadHistory]);
+    if (status === "unauthenticated") {
+      navigate({ to: "/auth", search: { redirect: "/history" } });
+    } else if (status === "authenticated") {
+      loadHistory();
+    }
+  }, [status, loadHistory, navigate]);
 
   const handleOpen = async (id: string) => {
     await selectAnalysis(id);
