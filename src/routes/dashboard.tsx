@@ -2,48 +2,50 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Shield, Loader2, Sparkles, FileText, LinkIcon } from "lucide-react";
-import { ClaimCard } from "@/components/analysis/ClaimCard";
-import { SourceCard } from "@/components/analysis/SourceCard";
-import { CredibilityScore } from "@/components/analysis/CredibilityScore";
-import { mockClaims, mockSources, mockOverallScore } from "@/components/analysis/mockData";
+import { Loader2, Sparkles, FileText, LinkIcon, Share2, AlertCircle } from "lucide-react";
+import { useAnalysis } from "@/lib/analysis/AnalysisContext";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { AnalysisReport } from "@/components/analysis/AnalysisReport";
+import { ShareDialog } from "@/components/analysis/ShareDialog";
+import { STAGE_LABEL, type AnalysisStage } from "@/lib/analysis/types";
+import { AuthDialog } from "@/components/layout/AuthDialog";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Misinformation Analysis System" },
+      { title: "Dashboard — Veritas" },
       { name: "description", content: "Paste text or a URL to detect misinformation, extract claims, and view credibility scores." },
     ],
   }),
   component: Dashboard,
 });
 
-type Status = "idle" | "loading" | "done";
+const STAGES: AnalysisStage[] = ["extracting", "verifying", "generating"];
 
 function Dashboard() {
+  const { user, status: authStatus } = useAuth();
+  const { current, stage, error, analyze } = useAnalysis();
   const [input, setInput] = useState("");
   const [mode, setMode] = useState<"text" | "url">("text");
-  const [status, setStatus] = useState<Status>("idle");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
 
-  const handleAnalyze = () => {
+  const isLoading = stage === "extracting" || stage === "verifying" || stage === "generating";
+  const loggedIn = authStatus === "authenticated" && !!user;
+
+  const handleAnalyze = async () => {
     if (!input.trim()) return;
-    setStatus("loading");
-    setTimeout(() => setStatus("done"), 1800);
+    if (!loggedIn) {
+      setAuthOpen(true);
+      return;
+    }
+    await analyze(input, mode);
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/60 border-b border-border/50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-primary grid place-items-center shadow-glow">
-              <Shield className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold tracking-tight">Veritas</span>
-          </Link>
-          <span className="text-xs text-muted-foreground">Analysis dashboard</span>
-        </div>
-      </header>
+      <AppHeader subtitle="Analysis dashboard" />
 
       <main className="max-w-5xl mx-auto px-6 py-12 space-y-10">
         <section className="bg-gradient-card border border-border/60 rounded-2xl p-6 md:p-8 shadow-elegant animate-fade-in">
@@ -93,15 +95,14 @@ function Dashboard() {
 
           <div className="mt-5 flex items-center justify-between gap-4">
             <p className="text-xs text-muted-foreground">
-              {input.length > 0 ? `${input.length} characters` : "Tip: longer text yields better analysis."}
+              {!loggedIn
+                ? "Sign in to run an analysis."
+                : input.length > 0
+                  ? `${input.length} characters`
+                  : "Tip: longer text yields better analysis."}
             </p>
-            <Button
-              onClick={handleAnalyze}
-              disabled={!input.trim() || status === "loading"}
-              variant="hero"
-              size="lg"
-            >
-              {status === "loading" ? (
+            <Button onClick={handleAnalyze} disabled={!input.trim() || isLoading} variant="hero" size="lg">
+              {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Analyzing...
@@ -113,57 +114,66 @@ function Dashboard() {
           </div>
         </section>
 
-        {status === "loading" && (
-          <section className="space-y-4 animate-fade-in">
-            <div className="bg-gradient-card border border-border/60 rounded-2xl p-8 text-center">
-              <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 grid place-items-center mb-4 animate-pulse-glow">
-                <Loader2 className="w-5 h-5 text-primary animate-spin" />
-              </div>
-              <h3 className="font-medium mb-1">Extracting claims & verifying sources</h3>
-              <p className="text-sm text-muted-foreground">This usually takes a few seconds.</p>
+        {isLoading && <LoadingStages stage={stage} />}
+
+        {stage === "error" && error && (
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-2xl p-5 flex items-start gap-3 animate-fade-in">
+            <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Analysis failed</p>
+              <p className="text-sm opacity-90">{error}</p>
             </div>
-            <div className="grid gap-3">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-24 rounded-xl border border-border/60 bg-muted/30 animate-pulse"
-                  style={{ animationDelay: `${i * 120}ms` }}
-                />
-              ))}
-            </div>
-          </section>
+          </div>
         )}
 
-        {status === "done" && (
-          <div className="space-y-8">
-            <CredibilityScore score={mockOverallScore} />
-
-            <section>
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="text-lg font-semibold tracking-tight">Extracted claims</h2>
-                <span className="text-xs text-muted-foreground">{mockClaims.length} claims found</span>
-              </div>
-              <div className="grid gap-4">
-                {mockClaims.map((claim, i) => (
-                  <ClaimCard key={claim.id} claim={claim} index={i} />
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="text-lg font-semibold tracking-tight">Sources</h2>
-                <span className="text-xs text-muted-foreground">{mockSources.length} references</span>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {mockSources.map((s) => (
-                  <SourceCard key={s.id} source={s} />
-                ))}
-              </div>
-            </section>
+        {stage === "done" && current && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-end">
+              <Button variant="outline" onClick={() => setShareOpen(true)} className="gap-1.5">
+                <Share2 className="w-4 h-4" /> Share
+              </Button>
+            </div>
+            <AnalysisReport analysis={current} />
           </div>
         )}
       </main>
+
+      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} analysisId={current?.id ?? null} />
+      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
     </div>
+  );
+}
+
+function LoadingStages({ stage }: { stage: AnalysisStage }) {
+  const currentIdx = STAGES.indexOf(stage);
+  return (
+    <section className="space-y-4 animate-fade-in">
+      <div className="bg-gradient-card border border-border/60 rounded-2xl p-8">
+        <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 grid place-items-center mb-5 animate-pulse-glow">
+          <Loader2 className="w-5 h-5 text-primary animate-spin" />
+        </div>
+        <ul className="space-y-2 max-w-sm mx-auto">
+          {STAGES.map((s, i) => {
+            const done = i < currentIdx;
+            const active = i === currentIdx;
+            return (
+              <li
+                key={s}
+                className={`flex items-center gap-3 text-sm transition-colors ${
+                  done ? "text-success" : active ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    done ? "bg-success" : active ? "bg-primary animate-pulse" : "bg-muted"
+                  }`}
+                />
+                {STAGE_LABEL[s as "extracting" | "verifying" | "generating"]}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
   );
 }
