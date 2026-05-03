@@ -7,11 +7,13 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { Loader2 } from "lucide-react";
 
 export function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { signInWithGoogle, signInWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busy, setBusy] = useState<null | "google" | "email">(null);
   const [error, setError] = useState<string | null>(null);
+  const isSignUp = mode === "signup";
 
   const handleGoogle = async () => {
     setError(null);
@@ -20,7 +22,7 @@ export function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       await signInWithGoogle();
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed.");
+      setError(e instanceof Error ? e.message : `${isSignUp ? "Sign-up" : "Sign-in"} failed.`);
     } finally {
       setBusy(null);
     }
@@ -32,10 +34,14 @@ export function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     setError(null);
     setBusy("email");
     try {
-      await signInWithEmail(email, password);
+      if (isSignUp) {
+        await signUpWithEmail(email, password);
+      } else {
+        await signInWithEmail(email, password);
+      }
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed.");
+      setError(e instanceof Error ? e.message : `${isSignUp ? "Sign-up" : "Sign-in"} failed.`);
     } finally {
       setBusy(null);
     }
@@ -45,8 +51,10 @@ export function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Sign in to Veritas</DialogTitle>
-          <DialogDescription>Save your analyses and share results with anyone.</DialogDescription>
+          <DialogTitle>{isSignUp ? "Create your Veritas account" : "Sign in to Veritas"}</DialogTitle>
+          <DialogDescription>
+            {isSignUp ? "Create an account to save and share analyses." : "Save your analyses and share results with anyone."}
+          </DialogDescription>
         </DialogHeader>
 
         <Button onClick={handleGoogle} disabled={busy !== null} variant="outline" className="w-full justify-center gap-2">
@@ -74,9 +82,22 @@ export function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <Button type="submit" variant="hero" className="w-full" disabled={busy !== null}>
-            {busy === "email" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
+            {busy === "email" ? <Loader2 className="w-4 h-4 animate-spin" /> : isSignUp ? "Create account" : "Sign in"}
           </Button>
         </form>
+
+        <div className="text-center text-xs text-muted-foreground">
+          {isSignUp ? "Already have an account?" : "No account yet?"}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="px-1"
+            onClick={() => setMode(isSignUp ? "signin" : "signup")}
+          >
+            {isSignUp ? "Sign in" : "Sign up"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

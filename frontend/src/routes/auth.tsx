@@ -9,8 +9,8 @@ import { useAuth } from "@/lib/auth/AuthContext";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Veritas" },
-      { name: "description", content: "Sign in to Veritas to analyze content and save your history." },
+      { title: "Sign in or sign up — Veritas" },
+      { name: "description", content: "Sign in or create an account to analyze content and save your history." },
     ],
   }),
   validateSearch: (search: Record<string, unknown>) => ({
@@ -20,13 +20,15 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { user, status, signInWithGoogle, signInWithEmail } = useAuth();
+  const { user, status, signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   const { redirect } = useSearch({ from: "/auth" });
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busy, setBusy] = useState<null | "google" | "email">(null);
   const [error, setError] = useState<string | null>(null);
+  const isSignUp = mode === "signup";
 
   // Auto-redirect if already authenticated
   useEffect(() => {
@@ -42,7 +44,7 @@ function AuthPage() {
       await signInWithGoogle();
       navigate({ to: redirect || "/dashboard" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed.");
+      setError(e instanceof Error ? e.message : `${isSignUp ? "Sign-up" : "Sign-in"} failed.`);
     } finally {
       setBusy(null);
     }
@@ -54,10 +56,14 @@ function AuthPage() {
     setError(null);
     setBusy("email");
     try {
-      await signInWithEmail(email, password);
+      if (isSignUp) {
+        await signUpWithEmail(email, password);
+      } else {
+        await signInWithEmail(email, password);
+      }
       navigate({ to: redirect || "/dashboard" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed.");
+      setError(e instanceof Error ? e.message : `${isSignUp ? "Sign-up" : "Sign-in"} failed.`);
     } finally {
       setBusy(null);
     }
@@ -79,9 +85,11 @@ function AuthPage() {
       <main className="flex-1 grid place-items-center px-6 py-12">
         <div className="w-full max-w-sm bg-gradient-card border border-border/60 rounded-2xl p-8 shadow-elegant animate-fade-in">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-semibold tracking-tight">Sign in to Veritas</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isSignUp ? "Create your Veritas account" : "Sign in to Veritas"}
+            </h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Save your analyses and share results.
+              {isSignUp ? "Create an account to save and share analyses." : "Save your analyses and share results."}
             </p>
           </div>
 
@@ -110,11 +118,24 @@ function AuthPage() {
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
             <Button type="submit" variant="hero" className="w-full" disabled={busy !== null}>
-              {busy === "email" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
+              {busy === "email" ? <Loader2 className="w-4 h-4 animate-spin" /> : isSignUp ? "Create account" : "Sign in"}
             </Button>
           </form>
 
-          <p className="mt-5 text-center text-xs text-muted-foreground">
+          <div className="mt-5 text-center text-xs text-muted-foreground">
+            {isSignUp ? "Already have an account?" : "No account yet?"}
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="px-1"
+              onClick={() => setMode(isSignUp ? "signin" : "signup")}
+            >
+              {isSignUp ? "Sign in" : "Sign up"}
+            </Button>
+          </div>
+
+          <p className="mt-2 text-center text-xs text-muted-foreground">
             <Link to="/" className="hover:text-foreground transition-colors">← Back to home</Link>
           </p>
         </div>
