@@ -179,7 +179,4 @@ frontend/
 - **Chroma down**: Start ChromaDB or verify `CHROMA_HOST`/`CHROMA_PORT`.
 - **No web results**: Configure `SERPAPI_API_KEY` or `SERPER_API_KEY`.
 
-## Security notes
 
-- Keep Firebase service account JSON files out of source control.
-- Avoid exposing `GEMINI_API_KEY` or other secrets in frontend `.env` files.
